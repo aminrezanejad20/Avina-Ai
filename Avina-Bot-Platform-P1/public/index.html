@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8" />
+  <title>Avina AI</title>
+  <link rel="icon" href="/photo.jpg" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { box-sizing: border-box; font-family: 'Vazir', Tahoma, sans-serif; }
+    body { background: linear-gradient(135deg, #5c6bc0, #42a5f5); padding: 30px; direction: rtl; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); overflow: hidden; }
+    header { background: linear-gradient(135deg, #3f51b5, #2196f3); color: white; padding: 30px 20px; text-align: center; font-size: 1.3rem; font-weight: bold; }
+    h3 { margin-bottom: 15px; color: #3f51b5; }
+    .form-section, .chat-section { padding: 30px; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; font-weight: bold; color: #444; }
+    input, textarea, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 15px; }
+    input:focus, textarea:focus, select:focus { border-color: #3f51b5; box-shadow: 0 0 5px rgba(63,81,181,0.3); outline: none; }
+    button { background: linear-gradient(135deg, #3f51b5, #2196f3); color: white; padding: 12px 24px; border: none; border-radius: 12px; cursor: pointer; font-size: 16px; transition: 0.3s; }
+    button:hover { transform: translateY(-2px); }
+    .advanced-toggle { background: #6c757d; border-radius: 8px; margin: 15px 0; }
+    .response-box { margin-top: 20px; padding: 20px; background: #f9f9fb; border-radius: 12px; border: 1px solid #eee; min-height: 100px; white-space: pre-wrap; line-height: 1.6; }
+    .loader { color: #3f51b5; font-style: italic; }
+    .model-loading { display: block; margin-top: 6px; font-size: 13px; color: #777; }
+    .history-box { margin-top: 15px; padding: 15px; background: #f0f0f0; border-radius: 10px; border: 1px solid #ddd; font-size: 14px; line-height: 1.5; display: none; }
+    .summary-box { margin-top: 10px; padding: 12px; background: #e8f5e8; border: 1px solid #a5d6a7; border-radius: 8px; font-size: 14px; color: #2e7d32; }
+    .toggle-btn { background: #4caf50; color: white; padding: 8px 12px; font-size: 13px; border: none; border-radius: 6px; cursor: pointer; margin: 5px 0; }
+    .rag-status { margin-top: 10px; font-size: 13px; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>پلتفرم هوش مصنوعی آوینا</header>
+
+    <div class="form-section" id="formSection">
+      <h3>ساخت ربات جدید</h3>
+      <div class="form-group">
+        <label>نام ربات *</label>
+        <input type="text" id="botName" placeholder="مثلاً: دستیار فروش" required />
+      </div>
+      <div class="form-group">
+        <label>مدل هوش مصنوعی *</label>
+        <select id="model" required disabled>
+          <option>در حال بارگذاری مدل‌ها...</option>
+        </select>
+        <span class="model-loading">مدل‌ها از سرور آوینا بارگذاری می‌شوند</span>
+      </div>
+      <div class="form-group">
+        <label>دستورالعمل سیستم (System Prompt)</label>
+        <textarea id="systemPrompt" rows="4" placeholder="مثلاً: تو یک دستیار فروش حرفه‌ای هستی..."></textarea>
+      </div>
+      <button onclick="createBot()">ساخت ربات و شروع چت</button>
+    </div>
+
+    <div class="form-section" id="knowledgeSection" style="display:none;">
+      <h3>پایگاه دانش (Knowledge Base)</h3>
+      <div class="form-group">
+        <label>آپلود فایل (PDF, DOCX, XLSX, TXT)</label>
+        <input type="file" id="knowledgeFile" accept=".pdf,.docx,.xlsx,.txt" />
+        <button onclick="uploadKnowledge()">پردازش فایل</button>
+      </div>
+      <div class="form-group">
+        <label>یا آدرس وب (URL)</label>
+        <input type="text" id="knowledgeUrl" placeholder="https://example.com/page.html" />
+        <button onclick="uploadUrl()">کرال صفحه</button>
+      </div>
+      <div id="knowledgeStatus" class="rag-status"></div>
+    </div>
+
+    <div class="chat-section" id="chatSection" style="display:none;">
+      <h3 id="botTitle"></h3>
+      <div id="summaryContainer" style="display:none;">
+        <div class="summary-box" id="summaryText"></div>
+      </div>
+      <button class="toggle-btn" onclick="toggleHistory()">تاریخچه مکالمات</button>
+      <div class="history-box" id="historyBox"></div>
+      <button class="advanced-toggle" onclick="toggleAdvanced()">تنظیمات پیشرفته مدل</button>
+
+      <div id="advancedSettings" style="display:none; margin: 15px 0; padding: 15px; border: 1px dashed #ccc; border-radius: 8px; background: #f9f9f9;">
+        <div class="form-group">
+          <label>Temperature: <span id="tempValue">0.7</span></label>
+          <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.7" oninput="document.getElementById('tempValue').textContent = this.value" />
+        </div>
+        <div class="form-group">
+          <label>Max Tokens: <span id="maxTokensValue">1024</span></label>
+          <input type="range" id="maxTokens" min="1" max="4096" step="1" value="1024" oninput="document.getElementById('maxTokensValue').textContent = this.value" />
+        </div>
+        <div class="form-group">
+          <label>Top P: <span id="topPValue">0.9</span></label>
+          <input type="range" id="topP" min="0" max="1" step="0.1" value="0.9" oninput="document.getElementById('topPValue').textContent = this.value" />
+        </div>
+        <div class="form-group">
+          <label>Stop Sequences</label>
+          <input type="text" id="stop1" placeholder="مثلاً: \n\nHuman:" />
+          <input type="text" id="stop2" placeholder="مثلاً: END" />
+          <input type="text" id="stop3" />
+          <input type="text" id="stop4" />
+        </div>
+        <div class="form-group">
+          <label>روش خلاصه‌سازی</label>
+          <select id="summarizationMode">
+            <option value="none">خاموش</option>
+            <option value="tokens">بر اساس توکن</option>
+            <option value="messages">بر اساس پیام</option>
+            <option value="hybrid">ترکیبی</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>حداکثر توکن برای خلاصه</label>
+          <input type="number" id="tokenThreshold" value="1500" />
+        </div>
+        <div class="form-group">
+          <label>حداکثر پیام برای خلاصه</label>
+          <input type="number" id="messageThreshold" value="6" />
+        </div>
+      </div>
+
+      <div class="form-group" style="display:flex; gap:10px;">
+        <input type="text" id="userMessage" placeholder="پیام خود را وارد کنید..." onkeypress="if(event.key==='Enter') sendMessage()" />
+        <button onclick="sendMessage()">ارسال</button>
+      </div>
+      <div class="response-box" id="response"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentBot = null;
+    let sessionId = null;
+    let models = [];
+    let fullHistory = [];
+
+    async function loadModels() {
+      try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+        models = Array.isArray(data) ? data : [];
+        const select = document.getElementById('model');
+        select.innerHTML = '';
+        select.disabled = true;
+        if (models.length === 0) {
+          select.innerHTML = '<option>هیچ مدلی یافت نشد</option>';
+          return;
+        }
+        models.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.id;
+          select.appendChild(opt);
+        });
+        select.disabled = false;
+        document.querySelector('.model-loading').textContent = `${models.length} مدل بارگذاری شد`;
+      } catch (error) {
+        console.error('Failed to load models:', error);
+        const select = document.getElementById('model');
+        select.innerHTML = '<option>بارگذاری ناموفق</option>';
+        select.disabled = true;
+      }
+    }
+
+    function toggleAdvanced() {
+      const el = document.getElementById('advancedSettings');
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleHistory() {
+      const el = document.getElementById('historyBox');
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function createBot() {
+      const name = document.getElementById('botName').value.trim();
+      const model = document.getElementById('model').value;
+      const prompt = document.getElementById('systemPrompt').value || "تو یک دستیار هوشمند هستی.";
+      if (!name || !model) {
+        alert('لطفاً نام و مدل ربات را انتخاب کنید.');
+        return;
+      }
+
+      currentBot = {
+        name, model, prompt,
+        summarization: {
+          mode: document.getElementById('summarizationMode').value,
+          tokenThreshold: parseInt(document.getElementById('tokenThreshold').value),
+          messageThreshold: parseInt(document.getElementById('messageThreshold').value)
+        }
+      };
+
+      sessionId = Date.now().toString();
+      fullHistory = [];
+
+      document.getElementById('botTitle').textContent = `${name} (${model})`;
+      document.getElementById('formSection').style.display = 'none';
+      document.getElementById('knowledgeSection').style.display = 'block';
+      document.getElementById('chatSection').style.display = 'block';
+      document.getElementById('response').textContent = 'ربات آماده است. فایل یا URL را آپلود کنید یا مستقیماً پیام دهید.';
+    }
+
+    async function uploadKnowledge() {
+      const fileInput = document.getElementById('knowledgeFile');
+      const statusDiv = document.getElementById('knowledgeStatus');
+      if (!fileInput.files.length) {
+        alert('لطفاً یک فایل انتخاب کنید.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      formData.append('session_id', sessionId);
+
+      statusDiv.textContent = 'در حال پردازش...';
+      try {
+        const res = await fetch('/api/upload-knowledge', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        statusDiv.innerHTML = `<span style="color:green;">✅ ${data.message}</span>`;
+      } catch (error) {
+        statusDiv.innerHTML = `<span style="color:red;">❌ خطا در آپلود</span>`;
+      }
+    }
+
+    async function uploadUrl() {
+      const urlInput = document.getElementById('knowledgeUrl');
+      const statusDiv = document.getElementById('knowledgeStatus');
+      const url = urlInput.value.trim();
+      if (!url) {
+        alert('لطفاً یک آدرس URL وارد کنید.');
+        return;
+      }
+
+      statusDiv.textContent = 'در حال کرال صفحه...';
+      try {
+        const res = await fetch('/api/upload-knowledge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, session_id: sessionId })
+        });
+        const data = await res.json();
+        statusDiv.innerHTML = `<span style="color:green;">✅ ${data.message}</span>`;
+      } catch (error) {
+        statusDiv.innerHTML = `<span style="color:red;">❌ خطا در کرال</span>`;
+      }
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('userMessage');
+      const responseDiv = document.getElementById('response');
+      const message = input.value.trim();
+      if (!message || !currentBot) return;
+
+      responseDiv.textContent = '';
+      fullHistory.push({ role: 'user', content: message });
+
+      const settings = {
+        model: currentBot.model,
+        systemPrompt: currentBot.prompt,
+        messages: [{ role: 'user', content: message }],
+        temperature: parseFloat(document.getElementById('temperature').value),
+        max_tokens: parseInt(document.getElementById('maxTokens').value),
+        top_p: parseFloat(document.getElementById('topP').value),
+        stop: [document.getElementById('stop1').value, document.getElementById('stop2').value, document.getElementById('stop3').value, document.getElementById('stop4').value].filter(s => s.trim()),
+        session_id: sessionId,
+        summarization: currentBot.summarization
+      };
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settings)
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let fullReply = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              try {
+                const json = JSON.parse(data);
+                if (json.content) {
+                  fullReply += json.content;
+                  responseDiv.textContent = fullReply;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        if (fullReply) {
+          fullHistory.push({ role: 'assistant', content: fullReply });
+          const historyBox = document.getElementById('historyBox');
+          historyBox.innerHTML = '';
+          fullHistory.forEach(msg => {
+            const p = document.createElement('p');
+            p.innerHTML = `<strong>${msg.role === 'user' ? 'کاربر' : 'ربات'}:</strong> ${msg.content}`;
+            historyBox.appendChild(p);
+          });
+        }
+      } catch (error) {
+        responseDiv.textContent = '❌ خطای شبکه.';
+        console.error(error);
+      }
+      input.value = '';
+    }
+
+    window.onload = loadModels;
+  </script>
+</body>
+</html>
