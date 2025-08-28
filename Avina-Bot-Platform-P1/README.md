@@ -15,4 +15,6 @@
 2. نصب وابستگی‌ها:
    ```bash
    npm install
+3. اجرای پلتفرم
+   ```bash
    npm start or node server.js
